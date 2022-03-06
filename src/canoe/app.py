@@ -42,10 +42,6 @@ class App:
         self.client = Client()
         container = self._layout()
 
-        def set_content(text):
-            self.content.text = text
-        self.client.set_content = set_content
-
         style = prompt_toolkit.styles.Style.from_dict(
             {
                 "status": "reverse",
@@ -61,7 +57,7 @@ class App:
 
         self.application = prompt_toolkit.application.Application(
             layout=prompt_toolkit.layout.Layout(
-                container, focused_element=self.content),
+                container, focused_element=self.client.container),
             full_screen=True,
             style=style,
             key_bindings=self.key_bindings,
@@ -82,7 +78,7 @@ class App:
 
         self.title_bar = Bar(self.client.get_title)
         self.address_bar = Bar(self.client.get_address, style="class:status")
-        self.content = prompt_toolkit.widgets.TextArea(read_only=True)
+
         self.status_bar = Bar(self.client.get_status, style="class:status")
         from .prompt import YesNoPrompt
         self.quit_prompt = YesNoPrompt()
@@ -91,7 +87,7 @@ class App:
             [
                 self.title_bar,
                 self.address_bar,
-                self.content,
+                self.client.container,
                 self.status_bar,
                 self.quit_prompt,
             ]
@@ -165,7 +161,7 @@ class App:
             if value == 'y':
                 event.app.exit()
             else:
-                event.app.layout.focus(self.content.buffer)
+                event.app.layout.focus(self.client.control)
         self.quit_prompt.focus(event, on_accept)
 
     def push_url(self, url: str):

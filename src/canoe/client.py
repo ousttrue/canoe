@@ -1,14 +1,31 @@
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Optional
 import aiohttp
+import re
 import bs4
 import prompt_toolkit.layout.containers
 import prompt_toolkit.layout.controls
+import prompt_toolkit.layout.processors
 import prompt_toolkit.filters
 import prompt_toolkit.buffer
 import prompt_toolkit.lexers
 import prompt_toolkit.document
 import prompt_toolkit.formatted_text
 import prompt_toolkit.widgets
+import prompt_toolkit.layout.utils
+import prompt_toolkit.styles
+
+CLIENT_STYLE = prompt_toolkit.styles.Style.from_dict({
+    "status": "reverse",
+    "status.position": "#aaaa00",
+    "status.key": "#ffaa00",
+    "not-searching": "#888888",
+    #
+    'anchor': '#0044ff underline',
+    'form': '#44ff00 underline',
+    'input': '#44ff00 underline',
+})
+
+ANCHORE_PATTERN = re.compile(r'\bclass:anchor class:_\d+\b')
 
 
 class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
@@ -18,6 +35,7 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
         self.lines: List[prompt_toolkit.formatted_text.StyleAndTextTuples] = [
             [('', '')]]
         self.title = ''
+        self.anchors = []
 
     def lex_document(self, document: prompt_toolkit.document.Document) -> Callable[[int], prompt_toolkit.formatted_text.StyleAndTextTuples]:
         return self.get_line
@@ -31,6 +49,11 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
     def new_line(self):
         self.lines.append([])
 
+    def push_anchor(self, tag: bs4.element.Tag) -> str:
+        n = len(self.anchors)
+        self.anchors.append(tag)
+        return f'class:anchor class:_{n}'
+
     def traverse(self, e: bs4.PageElement, style: str):
         match e:
             case bs4.Tag() as tag:
@@ -38,9 +61,9 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
                     case 'title':
                         self.title = tag.text
                     case 'a':
-                        style = '#0044ff underline'
+                        style = self.push_anchor(tag)
                     case 'form':
-                        self.push('form', '#44ff00 underline')
+                        self.push('form', 'class:form')
                     case 'input':
                         self.push('input', '#44ff00 underline')
                     case 'p' | 'div':
@@ -68,6 +91,44 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
         return ('\n'.join(lines), self.title)
 
 
+class HoverProcessor(prompt_toolkit.layout.processors.Processor):
+    def apply_transformation(
+        self, transformation_input: prompt_toolkit.layout.processors.TransformationInput
+    ) -> prompt_toolkit.layout.processors.Transformation:
+        (
+            buffer_control,
+            document,
+            lineno,
+            source_to_display,
+            fragments,
+            _,
+            _,
+        ) = transformation_input.unpack()
+
+        # In case of selection, highlight all matches.
+        # Get cursor column.
+        cursor_column: Optional[int]
+        if document.cursor_position_row == lineno:
+            cursor_column = source_to_display(document.cursor_position_col)
+        else:
+            cursor_column = None
+
+        fragments = prompt_toolkit.layout.utils.explode_text_fragments(
+            fragments)
+        if isinstance(cursor_column, int) and cursor_column < len(fragments):
+            style, text = fragments[cursor_column]  # type: ignore
+
+            m = ANCHORE_PATTERN.search(style)
+            if m:
+                for i, fragment in enumerate(fragments):
+                    style, text, *_ = fragment
+                    matched = m.group(0)
+                    if matched in style:
+                        fragments[i] = (style + ' reverse ', text)
+
+        return prompt_toolkit.layout.processors.Transformation(fragments)
+
+
 class Client:
     def __init__(self) -> None:
         self.lexer = BeautifulSoupLexer()
@@ -80,10 +141,14 @@ class Client:
         self.buffer = prompt_toolkit.buffer.Buffer(
             read_only=prompt_toolkit.filters.Condition(lambda: self.read_only))
 
+        input_processors = [
+            HoverProcessor(),
+        ]
+
         self.control = prompt_toolkit.layout.controls.BufferControl(
             buffer=self.buffer,
             lexer=self.lexer,
-            # input_processors=input_processors,
+            input_processors=input_processors,
             include_default_input_processors=False,
             # preview_search=True,
             # search_buffer_control=search_buffer_control

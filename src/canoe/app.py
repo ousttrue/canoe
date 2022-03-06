@@ -38,18 +38,9 @@ class KeyPress(NamedTuple):
 
 class App:
     def __init__(self) -> None:
-        from .client import Client
+        from .client import Client, CLIENT_STYLE
         self.client = Client()
         container = self._layout()
-
-        style = prompt_toolkit.styles.Style.from_dict(
-            {
-                "status": "reverse",
-                "status.position": "#aaaa00",
-                "status.key": "#ffaa00",
-                "not-searching": "#888888",
-            }
-        )
 
         self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
         self._keybind(self._quit, 'Q')
@@ -59,7 +50,7 @@ class App:
             layout=prompt_toolkit.layout.Layout(
                 container, focused_element=self.client.container),
             full_screen=True,
-            style=style,
+            style=CLIENT_STYLE,
             key_bindings=self.key_bindings,
             editing_mode=prompt_toolkit.enums.EditingMode.VI,
         )

@@ -14,12 +14,11 @@ from prompt_toolkit.layout.dimension import LayoutDimension as D
 
 
 class Root:
-    def __init__(self) -> None:
-        from ..commands import AsyncProcessor
-        self.processor = AsyncProcessor()
+    def __init__(self, queue) -> None:
+        self.queue = queue
 
         from ..client import Client
-        self.client = Client(self.processor.queue)
+        self.client = Client(queue)
 
         debug_layout = self._debug_layout()
         browser_layout = self._browser_layout()
@@ -106,7 +105,7 @@ class Root:
 
         self.status_bar = Bar(style="class:status")
 
-        from ..prompt import YesNoPrompt
+        from .prompt import YesNoPrompt
         self._quit_prompt = YesNoPrompt()
 
         splitter = prompt_toolkit.layout.containers.HSplit(
@@ -149,7 +148,7 @@ class Root:
         def callback(e: prompt_toolkit.key_binding.KeyPressEvent):
             async def task():
                 await func(e)
-            self.processor.queue.put_nowait(task)
+            self.queue.put_nowait(task)
 
         self._keybind(callback, *keys, **kw)
 

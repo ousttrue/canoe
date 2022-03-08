@@ -17,14 +17,25 @@ def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
 
 
 async def main():
+    #
     # command line
+    #
     parser = argparse.ArgumentParser(description='canoe 🛶 text browser.')
 
     parser.add_argument('url', help='open url')
     args = parser.parse_args()
 
+    #
+    # worker
+    #
+    from .async_processor import AsyncProcessor
+    processor = AsyncProcessor()
+
+    #
+    # UI
+    #
     from .ui.root import Root
-    root = Root()
+    root = Root(processor.queue)
 
     #
     # key bindings

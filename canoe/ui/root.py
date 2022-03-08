@@ -13,65 +13,14 @@ import prompt_toolkit.keys
 from prompt_toolkit.layout.dimension import LayoutDimension as D
 
 
-def quit(event: prompt_toolkit.key_binding.KeyPressEvent):
-    event.app.exit()
-
-
-def up(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
-    event.current_buffer.auto_up(count=event.arg)
-
-
-def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
-    event.current_buffer.auto_down(count=event.arg)
-
-
-class Bar:
-    def __init__(self, get_text, style="") -> None:
-        self.container = prompt_toolkit.layout.containers.Window(
-            content=prompt_toolkit.layout.controls.FormattedTextControl(
-                get_text),
-            height=D.exact(1),
-            style=style,
-        )
-
-    def __pt_container__(self) -> prompt_toolkit.layout.containers.Container:
-        return self.container
-
-
-class AddressBar:
-    def __init__(self, push_url, style="") -> None:
-        self.push_url = push_url
-        self.buffer = prompt_toolkit.buffer.Buffer(multiline=False)
-        self.has_focus = prompt_toolkit.filters.has_focus(self.buffer)
-        self.control = prompt_toolkit.layout.controls.BufferControl(
-            self.buffer)
-        self.container = prompt_toolkit.layout.containers.Window(
-            content=self.control,
-            height=D.exact(1),
-            style=style,
-        )
-
-    def set_text(self, text: str):
-        self.buffer.text = text
-
-    def __pt_container__(self) -> prompt_toolkit.layout.containers.Container:
-        return self.container
-
-    def focus(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        e.app.layout.focus(self.buffer)
-
-    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        self.push_url(self.buffer.text)
-        e.app.layout.focus_previous()
-
-
-class Browser:
+class Root:
     def __init__(self) -> None:
-        from .commands import AsyncProcessor
+        from ..commands import AsyncProcessor
         self.processor = AsyncProcessor()
 
-        from .client import Client, CLIENT_STYLE
+        from ..client import Client, CLIENT_STYLE
         self.client = Client(self.processor.queue)
+        from .address_bar import AddressBar
         self.address_bar = AddressBar(
             self.client.push_url, style="class:status")
 
@@ -101,11 +50,11 @@ class Browser:
         [status] # reverse
         [command]
         '''
-
+        from .bar import Bar
         self.title_bar = Bar(self.client.get_title)
 
         self.status_bar = Bar(self.client.get_status, style="class:status")
-        from .prompt import YesNoPrompt
+        from ..prompt import YesNoPrompt
         self._quit_prompt = YesNoPrompt()
 
         splitter = prompt_toolkit.layout.containers.HSplit(

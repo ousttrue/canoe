@@ -1,7 +1,19 @@
 import asyncio
 import argparse
-from . import browser
 import prompt_toolkit.key_binding.bindings.named_commands
+import prompt_toolkit.key_binding
+
+
+def quit(event: prompt_toolkit.key_binding.KeyPressEvent):
+    event.app.exit()
+
+
+def up(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+    event.current_buffer.auto_up(count=event.arg)
+
+
+def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+    event.current_buffer.auto_down(count=event.arg)
 
 
 async def main():
@@ -11,17 +23,18 @@ async def main():
     parser.add_argument('url', help='open url')
     args = parser.parse_args()
 
-    app = browser.Browser()
+    from .ui.root import Root
+    app = Root()
 
     #
     # key bindings
     #
-    app._keybind(browser.quit, 'Q', filter=app.client.has_focus)
+    app._keybind(quit, 'Q', filter=app.client.has_focus)
     app._keybind(app.quit_prompt, 'q', eager=True, filter=app.client.has_focus)
     app.key_bindings.add('h', filter=app.client.has_focus)(
         prompt_toolkit.key_binding.bindings.named_commands.get_by_name("backward-char"))
-    app._keybind(browser.down, 'j', filter=app.client.has_focus)
-    app._keybind(browser.up, 'k', filter=app.client.has_focus)
+    app._keybind(down, 'j', filter=app.client.has_focus)
+    app._keybind(up, 'k', filter=app.client.has_focus)
     app.key_bindings.add('l', filter=app.client.has_focus)(
         prompt_toolkit.key_binding.bindings.named_commands.get_by_name("forward-char"))
     # 0
@@ -34,7 +47,8 @@ async def main():
     # shift-tab
     app._keybind(app.address_bar.focus, 'U', filter=app.client.has_focus)
     app._keybind(app.client.focus, 'escape', filter=app.address_bar.has_focus)
-    app._keybind(app.address_bar.enter, 'enter', filter=app.address_bar.has_focus)
+    app._keybind(app.address_bar.enter, 'enter',
+                 filter=app.address_bar.has_focus)
 
     #
     # start up

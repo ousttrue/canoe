@@ -1,5 +1,4 @@
-from typing import NamedTuple, Callable, Union, Coroutine, Any
-import asyncio
+from typing import Callable, Union, Coroutine, Any
 import prompt_toolkit.application
 import prompt_toolkit.styles
 import prompt_toolkit.layout
@@ -11,6 +10,18 @@ import prompt_toolkit.key_binding
 import prompt_toolkit.filters
 import prompt_toolkit.keys
 from prompt_toolkit.layout.dimension import LayoutDimension as D
+
+
+def quit(event: prompt_toolkit.key_binding.KeyPressEvent):
+    event.app.exit()
+
+
+def up(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+    event.current_buffer.auto_up(count=event.arg)
+
+
+def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+    event.current_buffer.auto_down(count=event.arg)
 
 
 class Bar:
@@ -26,25 +37,13 @@ class Bar:
         return self.container
 
 
-class Request(NamedTuple):
-    url: str
-
-
-class KeyPress(NamedTuple):
-    e: prompt_toolkit.key_binding.KeyPressEvent
-    callback: Callable[[
-        prompt_toolkit.key_binding.KeyPressEvent], Coroutine[Any, Any, None]]
-
-
-class App:
+class Browser:
     def __init__(self) -> None:
         from .client import Client, CLIENT_STYLE
         self.client = Client()
         container = self._layout()
 
         self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
-        self._keybind(self._quit, 'Q')
-        self._keybind(self._quit_prompt, 'q', eager=True)
 
         self.application = prompt_toolkit.application.Application(
             layout=prompt_toolkit.layout.Layout(
@@ -52,11 +51,12 @@ class App:
             full_screen=True,
             style=CLIENT_STYLE,
             key_bindings=self.key_bindings,
-            editing_mode=prompt_toolkit.enums.EditingMode.VI,
+            # editing_mode=prompt_toolkit.enums.EditingMode.VI,
+            enable_page_navigation_bindings=False,
         )
 
-        self.queue = asyncio.Queue()
-        asyncio.create_task(self._worker())
+        from .commands import AsyncProcessor
+        self.processor = AsyncProcessor()
 
     def _layout(self) -> prompt_toolkit.layout.containers.Container:
         '''
@@ -72,7 +72,7 @@ class App:
 
         self.status_bar = Bar(self.client.get_status, style="class:status")
         from .prompt import YesNoPrompt
-        self.quit_prompt = YesNoPrompt()
+        self._quit_prompt = YesNoPrompt()
 
         splitter = prompt_toolkit.layout.containers.HSplit(
             [
@@ -80,7 +80,7 @@ class App:
                 self.address_bar,
                 self.client.container,
                 self.status_bar,
-                self.quit_prompt,
+                self._quit_prompt,
             ]
         )
         self.root = prompt_toolkit.layout.containers.FloatContainer(
@@ -103,21 +103,6 @@ class App:
         )
         return self.root
 
-    async def _worker(self):
-        while True:
-
-            command = await self.queue.get()
-            match command:
-                case Request() as req:
-                    await self.client.get_async(req.url)
-                case KeyPress(e, callback):
-                    await callback(e)
-                case _:
-                    raise NotImplementedError('unknown command')
-
-            # Notify the queue that the "work item" has been processed.
-            # queue.task_done()
-
     def _keybind(self, func: Callable[[prompt_toolkit.key_binding.KeyPressEvent], None], *keys: Union[prompt_toolkit.keys.Keys, str],
                  filter: prompt_toolkit.filters.FilterOrBool = True,
                  eager: prompt_toolkit.filters.FilterOrBool = False,
@@ -125,8 +110,6 @@ class App:
                  save_before: Callable[[prompt_toolkit.key_binding.KeyPressEvent], bool] = (
             lambda e: True),
             record_in_macro: prompt_toolkit.filters.FilterOrBool = True):
-        assert keys
-
         keys = tuple(prompt_toolkit.key_binding.key_bindings._parse_key(k)
                      for k in keys)
         self.key_bindings.bindings.append(
@@ -142,18 +125,32 @@ class App:
         )
         self.key_bindings._clear_cache()
 
-    def _quit(self, event: prompt_toolkit.key_binding.KeyPressEvent):
-        " Quit. "
-        event.app.exit()
+    def _keybind_async(self, func: Callable[[prompt_toolkit.key_binding.KeyPressEvent], Coroutine[Any, Any, None]], *keys: Union[prompt_toolkit.keys.Keys, str], **kw):
+        assert keys
 
-    def _quit_prompt(self, event: prompt_toolkit.key_binding.KeyPressEvent):
+        def callback(e: prompt_toolkit.key_binding.KeyPressEvent):
+            async def task():
+                await func(e)
+            self.processor.queue.put_nowait(task)
+
+        self._keybind(callback, *keys, **kw)
+
+    def quit_prompt(self, event: prompt_toolkit.key_binding.KeyPressEvent):
         " Quit. "
         def on_accept(value: str):
             if value == 'y':
                 event.app.exit()
             else:
                 event.app.layout.focus(self.client.control)
-        self.quit_prompt.focus(event, on_accept)
+        self._quit_prompt.focus(event, on_accept)
 
     def push_url(self, url: str):
-        self.queue.put_nowait(Request(url))
+        async def _async():
+            await self.client.get_async(url)
+        self.processor.queue.put_nowait(_async)
+
+    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        url = self.client.get_url_under_cursor()
+        if url:
+            self.push_url(url)
+            # await self.client.get_async(url)

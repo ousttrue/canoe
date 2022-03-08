@@ -140,6 +140,7 @@ class Client:
         self.read_only = True
         self.buffer = prompt_toolkit.buffer.Buffer(
             read_only=prompt_toolkit.filters.Condition(lambda: self.read_only))
+        self.has_focus = prompt_toolkit.filters.has_focus(self.buffer)
 
         input_processors = [
             HoverProcessor(),
@@ -148,7 +149,7 @@ class Client:
         self.control = prompt_toolkit.layout.controls.BufferControl(
             buffer=self.buffer,
             lexer=self.lexer,
-            input_processors=input_processors,
+            input_processors=input_processors,  # type: ignore
             include_default_input_processors=False,
             # preview_search=True,
             # search_buffer_control=search_buffer_control
@@ -185,3 +186,6 @@ class Client:
         self.read_only = False
         self.buffer.text = text
         self.read_only = True
+
+    def get_url_under_cursor(self) -> Optional[str]:
+        return 'http://www.github.com/'

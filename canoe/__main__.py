@@ -24,38 +24,39 @@ async def main():
     args = parser.parse_args()
 
     from .ui.root import Root
-    app = Root()
+    root = Root()
 
     #
     # key bindings
     #
-    app._keybind(quit, 'Q', filter=app.client.has_focus)
-    app._keybind(app.quit_prompt, 'q', eager=True, filter=app.client.has_focus)
-    app.key_bindings.add('h', filter=app.client.has_focus)(
+    root._keybind(quit, 'Q', filter=root.view.has_focus)
+    root._keybind(root.quit_prompt, 'q', eager=True,
+                  filter=root.view.has_focus)
+    root.key_bindings.add('h', filter=root.view.has_focus)(
         prompt_toolkit.key_binding.bindings.named_commands.get_by_name("backward-char"))
-    app._keybind(down, 'j', filter=app.client.has_focus)
-    app._keybind(up, 'k', filter=app.client.has_focus)
-    app.key_bindings.add('l', filter=app.client.has_focus)(
+    root._keybind(down, 'j', filter=root.view.has_focus)
+    root._keybind(up, 'k', filter=root.view.has_focus)
+    root.key_bindings.add('l', filter=root.view.has_focus)(
         prompt_toolkit.key_binding.bindings.named_commands.get_by_name("forward-char"))
     # 0
     # $
     # space
     # b
-    # enter
-    app._keybind(app.client.enter, 'enter', filter=app.client.has_focus)
+    root._keybind(root.enter, 'enter', filter=root.view.has_focus)
     # tab
     # shift-tab
-    app._keybind(app.address_bar.focus, 'U', filter=app.client.has_focus)
-    app._keybind(app.client.focus, 'escape', filter=app.address_bar.has_focus)
-    app._keybind(app.address_bar.enter, 'enter',
-                 filter=app.address_bar.has_focus)
+    root._keybind(root.address_bar.focus, 'U', filter=root.view.has_focus)
+    root._keybind(root.view.focus, 'escape',
+                  filter=root.address_bar.has_focus)
+    root._keybind(root.address_bar.enter, 'enter',
+                  filter=root.address_bar.has_focus)
 
     #
     # start up
     #
-    app.client.push_url(args.url)
+    root.client.push_url(args.url)
 
-    await app.application.run_async()
+    await root.application.run_async()
 
 if __name__ == '__main__':
     asyncio.get_event_loop().run_until_complete(main())

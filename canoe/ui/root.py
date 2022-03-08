@@ -1,4 +1,4 @@
-from typing import Callable, Union, Coroutine, Any
+from typing import Callable, Union, Coroutine, Any, Optional
 import prompt_toolkit.application
 import prompt_toolkit.styles
 import prompt_toolkit.layout
@@ -18,54 +18,18 @@ class Root:
         from ..commands import AsyncProcessor
         self.processor = AsyncProcessor()
 
-        from ..client import Client, CLIENT_STYLE
+        from ..client import Client
         self.client = Client(self.processor.queue)
-        from .address_bar import AddressBar
-        self.address_bar = AddressBar(
-            self.client.push_url, style="class:status")
 
-        def on_get():
-            self.address_bar.set_text(self.client.url)
-        self.client.on_get_callbacks.append(on_get)
+        debug_layout = self._debug_layout()
+        browser_layout = self._browser_layout()
 
-        container = self._layout()
+        layout = prompt_toolkit.layout.containers.VSplit([
+            debug_layout,
+            prompt_toolkit.layout.containers.Window(char='|', width=1),
+            browser_layout,
+        ])
 
-        self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
-
-        self.application = prompt_toolkit.application.Application(
-            layout=prompt_toolkit.layout.Layout(
-                container, focused_element=self.client.container),
-            full_screen=True,
-            style=CLIENT_STYLE,
-            key_bindings=self.key_bindings,
-            # editing_mode=prompt_toolkit.enums.EditingMode.VI,
-            enable_page_navigation_bindings=False,
-        )
-
-    def _layout(self) -> prompt_toolkit.layout.containers.Container:
-        '''
-        [title]
-        [address] # reverse
-        [content]
-        [status] # reverse
-        [command]
-        '''
-        from .bar import Bar
-        self.title_bar = Bar(self.client.get_title)
-
-        self.status_bar = Bar(self.client.get_status, style="class:status")
-        from ..prompt import YesNoPrompt
-        self._quit_prompt = YesNoPrompt()
-
-        splitter = prompt_toolkit.layout.containers.HSplit(
-            [
-                self.title_bar,
-                self.address_bar,
-                self.client.container,
-                self.status_bar,
-                self._quit_prompt,
-            ]
-        )
         self.root = prompt_toolkit.layout.containers.FloatContainer(
             # background
             content=prompt_toolkit.layout.containers.Window(
@@ -75,7 +39,7 @@ class Root:
             ),
             floats=[
                 prompt_toolkit.layout.containers.Float(
-                    splitter,
+                    layout,
                     transparent=True,
                     left=0,
                     right=0,
@@ -84,7 +48,78 @@ class Root:
                 ),
             ],
         )
-        return self.root
+
+        self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
+
+        from .style import CLIENT_STYLE
+        self.application = prompt_toolkit.application.Application(
+            layout=prompt_toolkit.layout.Layout(
+                self.root, focused_element=self.view.container),
+            full_screen=True,
+            style=CLIENT_STYLE,
+            key_bindings=self.key_bindings,
+            # editing_mode=prompt_toolkit.enums.EditingMode.VI,
+            enable_page_navigation_bindings=False,
+        )
+
+    def _debug_layout(self) -> prompt_toolkit.layout.containers.Container:
+        from .request_info import RequestInfo, ResponseInfo, Logger
+
+        self.request = RequestInfo()
+        self.client.on_request.bind(self.request.set_url)
+
+        self.response = ResponseInfo()
+        self.client.on_response.bind(self.response.set_response)
+
+        self.logger = Logger()
+        splitter = prompt_toolkit.layout.containers.HSplit([
+            self.request,
+            self.response,
+            self.logger
+        ], width=24)
+        return splitter
+
+    def _browser_layout(self) -> prompt_toolkit.layout.containers.Container:
+        '''
+        [title]
+        [address] # reverse
+        [content]
+        [status] # reverse
+        [command]
+        '''
+        from .address_bar import AddressBar
+        self.address_bar = AddressBar(
+            self.client.push_url, style="class:status")
+        self.client.on_request.bind(self.address_bar.set_text)
+
+        from .view_window import ViewWindow
+        self.view = ViewWindow()
+
+        from .bar import Bar
+        self.title_bar = Bar()
+
+        def on_body(body: str):
+            title = self.view.set_html_get_title(body)
+            self.title_bar.text = title
+
+        self.client.on_body.bind(on_body)
+
+        self.status_bar = Bar(style="class:status")
+
+        from ..prompt import YesNoPrompt
+        self._quit_prompt = YesNoPrompt()
+
+        splitter = prompt_toolkit.layout.containers.HSplit(
+            [
+                self.title_bar,
+                self.address_bar,
+                self.view,
+                self.status_bar,
+                self._quit_prompt,
+            ]
+        )
+
+        return splitter
 
     def _keybind(self, func: Callable[[prompt_toolkit.key_binding.KeyPressEvent], None], *keys: Union[prompt_toolkit.keys.Keys, str],
                  filter: prompt_toolkit.filters.FilterOrBool = True,
@@ -124,5 +159,10 @@ class Root:
             if value == 'y':
                 event.app.exit()
             else:
-                event.app.layout.focus(self.client.control)
+                event.app.layout.focus(self.view.control)
         self._quit_prompt.focus(event, on_accept)
+
+    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        url = self.view.get_url_under_cursor()
+        if url:
+            self.client.push_url(url)

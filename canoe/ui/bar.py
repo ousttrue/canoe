@@ -3,10 +3,11 @@ D = prompt_toolkit.layout.Dimension
 
 
 class Bar:
-    def __init__(self, get_text, style="") -> None:
+    def __init__(self, style="") -> None:
+        self.text = ''
         self.container = prompt_toolkit.layout.containers.Window(
             content=prompt_toolkit.layout.controls.FormattedTextControl(
-                get_text),
+                lambda: self.text),
             height=D.exact(1),
             style=style,
         )

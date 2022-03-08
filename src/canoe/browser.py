@@ -4,6 +4,7 @@ import prompt_toolkit.styles
 import prompt_toolkit.layout
 import prompt_toolkit.layout.containers
 import prompt_toolkit.layout.controls
+import prompt_toolkit.buffer
 import prompt_toolkit.widgets
 import prompt_toolkit.enums
 import prompt_toolkit.key_binding
@@ -37,10 +38,47 @@ class Bar:
         return self.container
 
 
+class AddressBar:
+    def __init__(self, push_url, style="") -> None:
+        self.push_url = push_url
+        self.buffer = prompt_toolkit.buffer.Buffer(multiline=False)
+        self.has_focus = prompt_toolkit.filters.has_focus(self.buffer)
+        self.control = prompt_toolkit.layout.controls.BufferControl(
+            self.buffer)
+        self.container = prompt_toolkit.layout.containers.Window(
+            content=self.control,
+            height=D.exact(1),
+            style=style,
+        )
+
+    def set_text(self, text: str):
+        self.buffer.text = text
+
+    def __pt_container__(self) -> prompt_toolkit.layout.containers.Container:
+        return self.container
+
+    def focus(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        e.app.layout.focus(self.buffer)
+
+    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        self.push_url(self.buffer.text)
+        e.app.layout.focus_previous()
+
+
 class Browser:
     def __init__(self) -> None:
+        from .commands import AsyncProcessor
+        self.processor = AsyncProcessor()
+
         from .client import Client, CLIENT_STYLE
-        self.client = Client()
+        self.client = Client(self.processor.queue)
+        self.address_bar = AddressBar(
+            self.client.push_url, style="class:status")
+
+        def on_get():
+            self.address_bar.set_text(self.client.url)
+        self.client.on_get_callbacks.append(on_get)
+
         container = self._layout()
 
         self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
@@ -55,9 +93,6 @@ class Browser:
             enable_page_navigation_bindings=False,
         )
 
-        from .commands import AsyncProcessor
-        self.processor = AsyncProcessor()
-
     def _layout(self) -> prompt_toolkit.layout.containers.Container:
         '''
         [title]
@@ -68,7 +103,6 @@ class Browser:
         '''
 
         self.title_bar = Bar(self.client.get_title)
-        self.address_bar = Bar(self.client.get_address, style="class:status")
 
         self.status_bar = Bar(self.client.get_status, style="class:status")
         from .prompt import YesNoPrompt
@@ -143,13 +177,3 @@ class Browser:
             else:
                 event.app.layout.focus(self.client.control)
         self._quit_prompt.focus(event, on_accept)
-
-    def push_url(self, url: str):
-        async def _async():
-            await self.client.get_async(url)
-        self.processor.queue.put_nowait(_async)
-
-    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        url = self.client.get_url_under_cursor()
-        if url:
-            self.push_url(url)

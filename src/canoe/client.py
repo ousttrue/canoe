@@ -2,6 +2,7 @@ from typing import Callable, List, Tuple, Optional
 import aiohttp
 import re
 import bs4
+from prompt_toolkit.application.current import get_app
 import prompt_toolkit.layout.containers
 import prompt_toolkit.layout.controls
 import prompt_toolkit.layout.processors
@@ -13,6 +14,7 @@ import prompt_toolkit.formatted_text
 import prompt_toolkit.widgets
 import prompt_toolkit.layout.utils
 import prompt_toolkit.styles
+import prompt_toolkit.key_binding
 
 CLIENT_STYLE = prompt_toolkit.styles.Style.from_dict({
     "status": "reverse",
@@ -78,7 +80,7 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
                 t = type(e)
                 raise RuntimeError(f'unknwon: {t}')
 
-    def tex_html(self, html: str) -> Tuple[str, str]:
+    def lex_html(self, html: str) -> Tuple[str, str]:
         soup = bs4.BeautifulSoup(html, 'html.parser')
         self.lines = [[]]
         self.title = ''
@@ -138,10 +140,11 @@ class HoverProcessor(prompt_toolkit.layout.processors.Processor):
 
 
 class Client:
-    def __init__(self) -> None:
+    def __init__(self, queue) -> None:
+        self.queue = queue
         self.lexer = BeautifulSoupLexer()
+        self.url = ''
         self.title = ''
-        self.address = ''
         self.status = ''
         self._wrap_lines = False
 
@@ -173,28 +176,34 @@ class Client:
             content=self.control,
         )
 
+        self.on_get_callbacks = []
+
+    def push_url(self, url: str):
+        async def _async():
+            await self.get_async(url)
+        self.queue.put_nowait(_async)
+
     def get_title(self):
         return self.title
-
-    def get_address(self):
-        return self.address
 
     def get_status(self):
         return self.status
 
     async def get_async(self, url: str):
+        self.url = url
         self.title = url
-        self.address = url
         self.text = f'get {url} ...'
         async with aiohttp.ClientSession() as session:
             async with session.get(url) as response:
                 self.status = f"{response.status}: {response.headers['content-type']}"
                 html = await response.text()
-        text, title = self.lexer.tex_html(html)
+        text, title = self.lexer.lex_html(html)
         self.title = title
         self.read_only = False
         self.buffer.text = text
         self.read_only = True
+        for callback in self.on_get_callbacks:
+            callback()
 
     def get_url_under_cursor(self) -> Optional[str]:
 
@@ -203,3 +212,11 @@ class Client:
                 anchor = self.lexer.anchors[anchor_index]
                 href = anchor['href']
                 return href
+
+    def focus(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        e.app.layout.focus(self.buffer)
+
+    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        url = self.get_url_under_cursor()
+        if url:
+            self.push_url(url)

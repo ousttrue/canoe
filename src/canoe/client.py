@@ -73,7 +73,7 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
                 for child in tag.children:
                     self.traverse(child, style)
             case bs4.element.NavigableString():
-                self.push(e.text, style)
+                self.push(e.get_text(strip=True), style)
             case bs4.element.Doctype():
                 pass
             case _:

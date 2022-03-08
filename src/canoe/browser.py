@@ -153,4 +153,3 @@ class Browser:
         url = self.client.get_url_under_cursor()
         if url:
             self.push_url(url)
-            # await self.client.get_async(url)

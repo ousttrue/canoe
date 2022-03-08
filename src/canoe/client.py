@@ -25,7 +25,7 @@ CLIENT_STYLE = prompt_toolkit.styles.Style.from_dict({
     'input': '#44ff00 underline',
 })
 
-ANCHORE_PATTERN = re.compile(r'\bclass:anchor class:_\d+\b')
+ANCHORE_PATTERN = re.compile(r'\bclass:anchor class:_(\d+)\b')
 
 
 class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
@@ -92,6 +92,10 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
 
 
 class HoverProcessor(prompt_toolkit.layout.processors.Processor):
+    def __init__(self) -> None:
+        super().__init__()
+        self.anchor_index: Optional[int] = None
+
     def apply_transformation(
         self, transformation_input: prompt_toolkit.layout.processors.TransformationInput
     ) -> prompt_toolkit.layout.processors.Transformation:
@@ -115,16 +119,20 @@ class HoverProcessor(prompt_toolkit.layout.processors.Processor):
 
         fragments = prompt_toolkit.layout.utils.explode_text_fragments(
             fragments)
-        if isinstance(cursor_column, int) and cursor_column < len(fragments):
-            style, text = fragments[cursor_column]  # type: ignore
+        if isinstance(cursor_column, int):
+            if cursor_column < len(fragments):
+                style, text = fragments[cursor_column]  # type: ignore
 
-            m = ANCHORE_PATTERN.search(style)
-            if m:
-                for i, fragment in enumerate(fragments):
-                    style, text, *_ = fragment
-                    matched = m.group(0)
-                    if matched in style:
-                        fragments[i] = (style + ' reverse ', text)
+                m = ANCHORE_PATTERN.search(style)
+                if m:
+                    self.anchor_index = int(m.group(1))
+                    for i, fragment in enumerate(fragments):
+                        style, text, *_ = fragment
+                        matched = m.group(0)
+                        if matched in style:
+                            fragments[i] = (style + ' reverse ', text)
+                else:
+                    self.anchor_index = None
 
         return prompt_toolkit.layout.processors.Transformation(fragments)
 
@@ -142,8 +150,9 @@ class Client:
             read_only=prompt_toolkit.filters.Condition(lambda: self.read_only))
         self.has_focus = prompt_toolkit.filters.has_focus(self.buffer)
 
+        self.hover = HoverProcessor()
         input_processors = [
-            HoverProcessor(),
+            self.hover,
         ]
 
         self.control = prompt_toolkit.layout.controls.BufferControl(
@@ -188,4 +197,9 @@ class Client:
         self.read_only = True
 
     def get_url_under_cursor(self) -> Optional[str]:
-        return 'http://www.github.com/'
+
+        match self.hover.anchor_index:
+            case int() as anchor_index:
+                anchor = self.lexer.anchors[anchor_index]
+                href = anchor['href']
+                return href

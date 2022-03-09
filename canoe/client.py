@@ -1,5 +1,7 @@
 from typing import Generic, TypeVar, List, Callable
 import aiohttp
+import logging
+logger = logging.getLogger(__name__)
 
 
 T = TypeVar('T')
@@ -29,6 +31,7 @@ class Client:
 
     def push_url(self, url: str):
         async def _async():
+            logger.info(url)
             self.on_request(url)
             async with self.session.get(url) as response:
                 self.on_response(response)

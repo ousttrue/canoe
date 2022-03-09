@@ -20,14 +20,7 @@ class Root:
         from ..client import Client
         self.client = Client(queue)
 
-        debug_layout = self._debug_layout()
         browser_layout = self._browser_layout()
-
-        layout = prompt_toolkit.layout.containers.VSplit([
-            debug_layout,
-            prompt_toolkit.layout.containers.Window(char='|', width=1),
-            browser_layout,
-        ])
 
         self.root = prompt_toolkit.layout.containers.FloatContainer(
             # background
@@ -38,7 +31,7 @@ class Root:
             ),
             floats=[
                 prompt_toolkit.layout.containers.Float(
-                    layout,
+                    browser_layout,
                     transparent=True,
                     left=0,
                     right=0,
@@ -60,23 +53,6 @@ class Root:
             # editing_mode=prompt_toolkit.enums.EditingMode.VI,
             enable_page_navigation_bindings=False,
         )
-
-    def _debug_layout(self) -> prompt_toolkit.layout.containers.Container:
-        from .request_info import RequestInfo, ResponseInfo, Logger
-
-        self.request = RequestInfo()
-        self.client.on_request.bind(self.request.set_url)
-
-        self.response = ResponseInfo()
-        self.client.on_response.bind(self.response.set_response)
-
-        self.logger = Logger()
-        splitter = prompt_toolkit.layout.containers.HSplit([
-            self.request,
-            self.response,
-            self.logger
-        ], width=24)
-        return splitter
 
     def _browser_layout(self) -> prompt_toolkit.layout.containers.Container:
         '''
@@ -117,12 +93,25 @@ class Root:
         from .prompt import YesNoPrompt
         self._quit_prompt = YesNoPrompt()
 
+        from .request_info import RequestInfo, ResponseInfo, Logger
+
+        self.request = RequestInfo()
+        self.client.on_request.bind(self.request.set_url)
+
+        self.response = ResponseInfo()
+        self.client.on_response.bind(self.response.set_response)
+
+        self.logger = Logger()
+
         splitter = prompt_toolkit.layout.containers.HSplit(
             [
                 self.title_bar,
                 self.address_bar,
+                self.request,
+                self.response,
                 self.view,
                 self.status_bar,
+                self.logger,
                 self._quit_prompt,
             ]
         )

@@ -2,6 +2,8 @@ import asyncio
 import argparse
 import prompt_toolkit.key_binding.bindings.named_commands
 import prompt_toolkit.key_binding
+import logging
+logger = logging.getLogger(__name__)
 
 
 def quit(event: prompt_toolkit.key_binding.KeyPressEvent):
@@ -71,4 +73,6 @@ async def main():
     await root.application.run_async()
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.DEBUG)
+    logger.debug('start')
     asyncio.get_event_loop().run_until_complete(main())

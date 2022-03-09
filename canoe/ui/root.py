@@ -103,7 +103,16 @@ class Root:
 
         self.client.on_body.bind(on_body)
 
-        self.status_bar = Bar(style="class:status")
+        from .status_bar import StatusBar
+
+        def get_status() -> str:
+            doc = self.view.buffer.document
+            row = doc.cursor_position_row + 1
+            col = doc.cursor_position_col + 1
+            lines = len(doc.lines)
+            return f'row:{row}/{lines},col:{col}'
+
+        self.status_bar = StatusBar(get_status)
 
         from .prompt import YesNoPrompt
         self._quit_prompt = YesNoPrompt()

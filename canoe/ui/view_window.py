@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable, List
 import prompt_toolkit.layout
 import prompt_toolkit.buffer
 import prompt_toolkit.filters
@@ -8,13 +8,23 @@ import prompt_toolkit.key_binding
 class ViewWindow:
     def __init__(self) -> None:
         self.read_only = True
+        self.on_buffer_callbacks: List[Callable[[
+            prompt_toolkit.buffer.Buffer], None]] = []
+
+        def on_buffer_changed(buffer: prompt_toolkit.buffer.Buffer):
+            for callback in self.on_buffer_callbacks:
+                callback(buffer)
+
         self.buffer = prompt_toolkit.buffer.Buffer(
-            read_only=prompt_toolkit.filters.Condition(lambda: self.read_only))
+            read_only=prompt_toolkit.filters.Condition(lambda: self.read_only),
+            on_cursor_position_changed=on_buffer_changed)
         self.has_focus = prompt_toolkit.filters.has_focus(self.buffer)
 
-        from .hover_processor import HoverProcessor
+        from .hover_processor import AnchorProcessor, HoverProcessor
+        self.anchor = AnchorProcessor()
         self.hover = HoverProcessor()
         input_processors = [
+            self.anchor,
             self.hover,
         ]
 
@@ -61,3 +71,15 @@ class ViewWindow:
 
     def focus(self, e: prompt_toolkit.key_binding.KeyPressEvent):
         e.app.layout.focus(self.buffer)
+
+    def anchor_next(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        anchor = self.anchor.get_anchor_next(self.buffer.document)
+        if anchor:
+            self.buffer.cursor_position = self.buffer.document.translate_row_col_to_index(
+                anchor.row, anchor.col_start)
+
+    def anchor_prev(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        anchor = self.anchor.get_anchor_prev(self.buffer.document)
+        if anchor:
+            self.buffer.cursor_position = self.buffer.document.translate_row_col_to_index(
+                anchor.row, anchor.col_start)

@@ -54,7 +54,8 @@ async def main():
     # space
     # b
     root._keybind(root.enter, 'enter', filter=root.view.has_focus)
-    # tab
+    root._keybind(root.view.anchor_next, 'tab', filter=root.view.has_focus)
+    root._keybind(root.view.anchor_prev, 's-tab', filter=root.view.has_focus)
     # shift-tab
     root._keybind(root.address_bar.focus, 'U', filter=root.view.has_focus)
     root._keybind(root.view.focus, 'escape',

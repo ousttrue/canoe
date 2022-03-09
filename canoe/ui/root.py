@@ -105,14 +105,14 @@ class Root:
 
         from .status_bar import StatusBar
 
-        def get_status() -> str:
-            doc = self.view.buffer.document
-            row = doc.cursor_position_row + 1
-            col = doc.cursor_position_col + 1
-            lines = len(doc.lines)
-            return f'row:{row}/{lines},col:{col}'
+        self.status_bar = StatusBar()
 
-        self.status_bar = StatusBar(get_status)
+        def on_buffer_changed(buffer: prompt_toolkit.buffer.Buffer):
+            doc = buffer.document
+            self.status_bar.row = doc.cursor_position_row + 1
+            self.status_bar.col = doc.cursor_position_col + 1
+            self.status_bar.lines = len(doc.lines)
+        self.view.on_buffer_callbacks.append(on_buffer_changed)
 
         from .prompt import YesNoPrompt
         self._quit_prompt = YesNoPrompt()

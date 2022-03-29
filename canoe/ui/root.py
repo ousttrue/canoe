@@ -8,9 +8,22 @@ import prompt_toolkit.buffer
 import prompt_toolkit.widgets
 import prompt_toolkit.enums
 import prompt_toolkit.key_binding
+import prompt_toolkit.key_binding.bindings.named_commands
 import prompt_toolkit.filters
 import prompt_toolkit.keys
 from prompt_toolkit.layout.dimension import LayoutDimension as D
+
+
+def quit(event: prompt_toolkit.key_binding.KeyPressEvent):
+    event.app.exit()
+
+
+def up(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+    event.current_buffer.auto_up(count=event.arg)
+
+
+def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+    event.current_buffer.auto_down(count=event.arg)
 
 
 class Root:
@@ -53,6 +66,33 @@ class Root:
             # editing_mode=prompt_toolkit.enums.EditingMode.VI,
             enable_page_navigation_bindings=False,
         )
+
+        #
+        # key bindings
+        #
+        self._keybind(quit, 'Q', filter=self.view.has_focus)
+        self._keybind(self.quit_prompt, 'q', eager=True,
+                      filter=self.view.has_focus)
+        self.key_bindings.add('h', filter=self.view.has_focus)(
+            prompt_toolkit.key_binding.bindings.named_commands.get_by_name("backward-char"))
+        self._keybind(down, 'j', filter=self.view.has_focus)
+        self._keybind(up, 'k', filter=self.view.has_focus)
+        self.key_bindings.add('l', filter=self.view.has_focus)(
+            prompt_toolkit.key_binding.bindings.named_commands.get_by_name("forward-char"))
+        # 0
+        # $
+        # space
+        # b
+        self._keybind(self.enter, 'enter', filter=self.view.has_focus)
+        self._keybind(self.view.focus_next, 'tab', filter=self.view.has_focus)
+        self._keybind(self.view.focus_prev, 's-tab',
+                      filter=self.view.has_focus)
+        # shift-tab
+        self._keybind(self.address_bar.focus, 'U', filter=self.view.has_focus)
+        self._keybind(self.view.focus, 'escape',
+                      filter=self.address_bar.has_focus)
+        self._keybind(self.address_bar.enter, 'enter',
+                      filter=self.address_bar.has_focus)
 
     def _browser_layout(self) -> prompt_toolkit.layout.containers.Container:
         '''

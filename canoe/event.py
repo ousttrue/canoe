@@ -48,14 +48,16 @@ class OpenCommand(NamedTuple):
 
 
 class FocusInputCommand(NamedTuple):
+    url: str
     tag: bs4.Tag
 
 
-class UpdateHtml(NamedTuple):
-    html: str
+# class UpdateHtml(NamedTuple):
+#     html: str
 
 
 class UpdateSoup(NamedTuple):
+    url: str
     soup: bs4.BeautifulSoup
 
 

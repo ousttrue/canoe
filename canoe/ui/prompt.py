@@ -1,5 +1,5 @@
-import asyncio
-from typing import Callable
+from typing import Callable, cast
+import bs4
 from prompt_toolkit.application.current import get_app
 import prompt_toolkit.layout.containers
 import prompt_toolkit.layout.controls
@@ -97,5 +97,5 @@ class InputPrompt(prompt_toolkit.layout.containers.ConditionalContainer):
         command.tag['value'] = text
         get_app().layout.focus_last()
 
-        parents = [p for p in command.tag.parents]
-        event.enqueue(event.UpdateSoup(parents[-1]))  # type: ignore
+        soup = cast(bs4.BeautifulSoup, [p for p in command.tag.parents][-1])
+        event.enqueue(event.UpdateSoup(command.url, soup))

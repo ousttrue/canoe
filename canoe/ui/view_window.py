@@ -5,12 +5,43 @@ import prompt_toolkit.buffer
 import prompt_toolkit.filters
 import prompt_toolkit.key_binding
 import prompt_toolkit.key_binding.bindings.named_commands
+import urllib.parse
 from .. import event
+
+
+def create_form_url(form: bs4.Tag, base_url) -> Tuple[str, str]:
+    method = form.get('method', 'GET')
+    assert(isinstance(method, str))
+    action = form.get('action', '')
+    assert(isinstance(action, str))
+    if action.startswith('http:') or action.startswith('https:'):
+        pass
+    else:
+        action = urllib.parse.urljoin(base_url, action)
+
+    # query
+    inputs = form.find_all('input')
+    values = {}
+    for input in inputs:
+        name = input.get('name')
+        if name in ['iflsig', 'btnG', 'btnI']:
+            continue
+        value = input.get('value')
+        if name:
+            if value:
+                values[name] = value
+            else:
+                values[name] = ''
+    query = '&'.join(f'{k}={v}' if v else k for k, v in values.items())
+
+    return (method, action + '?' + query)
 
 
 class ViewWindow:
     def __init__(self, kb: prompt_toolkit.key_binding.KeyBindings) -> None:
         self.kb = kb
+        self.url = None
+        self.soup = bs4.BeautifulSoup
         self.read_only = True
         self.on_buffer_callbacks: List[Callable[[
             prompt_toolkit.buffer.Buffer], None]] = []
@@ -73,13 +104,21 @@ class ViewWindow:
         self._keybind(self.focus_next, 'tab')
         self._keybind(self.focus_prev, 's-tab')
 
+    @property
+    def base_urL(self) -> str:
+        assert(self.url)
+        u = urllib.parse.urlsplit(self.url)
+        path = u.path
+        return urllib.parse.urlunsplit(u._replace(path=path.rsplit('/', 1)[0], query=''))
+
     def _keybind(self, callback, *args):
         self.kb.add(*args, filter=self.has_focus, eager=True)(callback)
 
     def __pt_container__(self) -> prompt_toolkit.layout.containers.Container:
         return self.container
 
-    def set_html_soup(self, soup: bs4.BeautifulSoup) -> str:
+    def set_html_soup(self, url: str, soup: bs4.BeautifulSoup) -> str:
+        self.url = url
         self.soup = soup
         text, title = self.lexer.lex_html(soup)
         self.read_only = False
@@ -88,6 +127,7 @@ class ViewWindow:
         return title
 
     def get_url_under_cursor(self) -> Optional[Tuple[str, str]]:
+        assert(self.url)
         from .beautifulsoup_lexer import Anchor, Input
         match self.hover.anchor_index:
             case int() as anchor_index:
@@ -100,12 +140,10 @@ class ViewWindow:
                         if form:
                             match tag.get('type', 'text'):
                                 case 'submit':
-                                    method = form.get('method', 'GET')
-                                    action = form.get('action')
-                                    if action:
-                                        return (method, action)  # type: ignore
+                                    return create_form_url(form, self.base_urL)
                                 case 'text':
-                                    event.enqueue(event.FocusInputCommand(tag))
+                                    event.enqueue(
+                                        event.FocusInputCommand(self.url, tag))
 
             case _:
                 return None

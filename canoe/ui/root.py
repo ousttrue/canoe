@@ -12,6 +12,7 @@ import prompt_toolkit.key_binding
 import prompt_toolkit.key_binding.bindings.named_commands
 import prompt_toolkit.filters
 import prompt_toolkit.keys
+import prompt_toolkit.cursor_shapes
 from prompt_toolkit.layout.dimension import LayoutDimension as D
 from .. import event
 
@@ -53,6 +54,7 @@ class Root:
             key_bindings=self.key_bindings,
             # editing_mode=prompt_toolkit.enums.EditingMode.VI,
             enable_page_navigation_bindings=False,
+            cursor=prompt_toolkit.cursor_shapes.CursorShape.BLOCK,
         )
 
         self.view._keybind(self.quit_prompt, 'q')
@@ -86,13 +88,8 @@ class Root:
         from .bar import Bar
         self.title_bar = Bar()
 
-        def on_body(payload: event.UpdateHtml):
-            soup = bs4.BeautifulSoup(payload.html, 'html.parser')
-            event.enqueue(event.UpdateSoup(soup))
-        event.register(event.UpdateHtml, on_body)
-
         def on_soup(payload: event.UpdateSoup):
-            title = self.view.set_html_soup(payload.soup)
+            title = self.view.set_html_soup(payload.url, payload.soup)
             self.title_bar.text = title
         event.register(event.UpdateSoup, on_soup)
 

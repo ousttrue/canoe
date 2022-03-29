@@ -114,10 +114,7 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
             for row in range(doc.cursor_position_row, len(doc.lines)):
                 line_list = self.focus_line_map.get(row)
                 if line_list:
-                    for focus in line_list:
-                        if not isinstance(target,
-                                          int) or focus.col_start > target:
-                            return focus
+                    return line_list[0]
         return None
 
     def get_focus_prev(
@@ -130,10 +127,7 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
             for row in range(doc.cursor_position_row, len(doc.lines)):
                 line_list = self.focus_line_map.get(row)
                 if line_list:
-                    for focus in line_list:
-                        if not isinstance(target,
-                                          int) or focus.col_end < target:
-                            return focus
+                    return line_list[-1]
         return None
 
 

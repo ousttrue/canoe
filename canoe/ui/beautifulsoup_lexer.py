@@ -47,7 +47,9 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
         return self.get_line
 
     def get_line(self, index: int) -> prompt_toolkit.formatted_text.StyleAndTextTuples:
-        return self.lines[index]
+        if index>=0 and index<len(self.lines):
+            return self.lines[index]
+        retrn 
 
     def push(self, text: str, style: str):
         self.lines[-1].append((style, text))

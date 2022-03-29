@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "canoe",
             "args": [
-                "http://www.google.com",
+                "https://www.google.com",
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/src"

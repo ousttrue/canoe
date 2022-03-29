@@ -32,6 +32,7 @@ class Root:
         from ..client import Client
         self.client = Client()
 
+        self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
         browser_layout = self._browser_layout()
 
         self.root = prompt_toolkit.layout.containers.FloatContainer(
@@ -52,8 +53,6 @@ class Root:
                 ),
             ],
         )
-
-        self.key_bindings = prompt_toolkit.key_binding.KeyBindings()
 
         from .style import CLIENT_STYLE
         self.application = prompt_toolkit.application.Application(
@@ -88,10 +87,6 @@ class Root:
                       filter=self.view.has_focus)
         # shift-tab
         self._keybind(self.address_bar.focus, 'U', filter=self.view.has_focus)
-        self._keybind(self.view.focus, 'escape',
-                      filter=self.address_bar.has_focus)
-        self._keybind(self.address_bar.enter, 'enter',
-                      filter=self.address_bar.has_focus)
 
     def _browser_layout(self) -> prompt_toolkit.layout.containers.Container:
         '''
@@ -102,7 +97,7 @@ class Root:
         [command]
         '''
         from .address_bar import AddressBar
-        self.address_bar = AddressBar(style="class:status")
+        self.address_bar = AddressBar(self.key_bindings, style="class:status")
         self.client.on_request.bind(self.address_bar.set_text)
 
         from .view_window import ViewWindow

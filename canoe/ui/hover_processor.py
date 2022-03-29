@@ -35,7 +35,6 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
     def __init__(self) -> None:
         super().__init__()
         self.document: Optional[prompt_toolkit.document.Document] = None
-        self.focus_list: List[Focus] = []
         self.focus_map: Dict[int, Focus] = {}
         self.focus_line_map: Dict[int, List[Focus]] = {}
 
@@ -55,7 +54,6 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
 
         if self.document != document:
             self.document = document
-            self.focus_list.clear()
             self.focus_map.clear()
             self.focus_line_map.clear()
 
@@ -77,7 +75,6 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
                         focus.push(i, text)
                     else:
                         focus = Focus(focus_index, lineno, i, i, text)
-                        self.focus_list.append(focus)
                         self.focus_map[focus_index] = focus
                         line_list.append(focus)
 
@@ -93,13 +90,25 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
                     return focus
         return None
 
+    def _get_next(self, focus: Focus):
+        for k, v in self.focus_map.items():
+            if v == focus:
+                for kk in sorted(self.focus_map.keys()):
+                    if kk > k:
+                        return self.focus_map[kk]
+
+    def _get_prev(self, focus: Focus):
+        for k, v in self.focus_map.items():
+            if v == focus:
+                for kk in reversed(sorted(self.focus_map.keys())):
+                    if kk < k:
+                        return self.focus_map[kk]
+
     def get_focus_next(
             self, doc: prompt_toolkit.document.Document) -> Optional[Focus]:
         focus = self._cursor_focus(doc)
         if focus:
-            index = self.focus_list.index(focus)
-            if index != -1 and index + 1 < len(self.focus_list):
-                return self.focus_list[index + 1]
+            return self._get_next(focus)
         else:
             target = doc.cursor_position_col
             for row in range(doc.cursor_position_row, len(doc.lines)):
@@ -115,9 +124,7 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
             self, doc: prompt_toolkit.document.Document) -> Optional[Focus]:
         focus = self._cursor_focus(doc)
         if focus:
-            index = self.focus_list.index(focus)
-            if index >= 1 and index - 1 < len(self.focus_list):
-                return self.focus_list[index - 1]
+            return self._get_prev(focus)
         else:
             target = doc.cursor_position_col
             for row in range(doc.cursor_position_row, len(doc.lines)):

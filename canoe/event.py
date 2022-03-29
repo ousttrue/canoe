@@ -1,6 +1,8 @@
 from typing import Any, NamedTuple, Dict, TypeAlias, Callable, Type, Generic, List, TypeVar, Awaitable
 import logging
 import asyncio
+import inspect
+import bs4
 
 
 logger = logging.getLogger(__name__)
@@ -11,19 +13,50 @@ T = TypeVar('T')
 
 class Event(Generic[T]):
     def __init__(self) -> None:
-        self.callbacks: List[Callable[[T], None]] = []
+        self.callbacks: Dict[Callable[[T], None], bool] = {}
 
-    def bind(self, callback: Callable[[T], None]):
-        self.callbacks.append(callback)
+    def bind(self, callback: Callable[[T], None], once=False):
+        self.callbacks[callback] = once
+
+    def once(self, callback: Callable[[T], None]):
+        self.bind(callback, True)
+
+    def __iadd__(self, callback):
+        self.bind(callback, False)
 
     def __call__(self, value: T):
-        for callback in self.callbacks:
+        once_list = []
+        for callback, once in self.callbacks.items():
             callback(value)
+            if once:
+                once_list.append(callback)
+        for callback in once_list:
+            del self.callbacks[callback]
+
+    async def wait_async(self):
+        future = asyncio.Future()
+
+        def callback(value):
+            future.set_result(value)
+        self.once(callback)
+        return await future
 
 
 class OpenCommand(NamedTuple):
     method: str
     url: str
+
+
+class FocusInputCommand(NamedTuple):
+    tag: bs4.Tag
+
+
+class UpdateHtml(NamedTuple):
+    html: str
+
+
+class UpdateSoup(NamedTuple):
+    soup: bs4.BeautifulSoup
 
 
 AwaitableEventHandler: TypeAlias = Callable[[Any], Awaitable]
@@ -52,11 +85,9 @@ class EventDispatcher:
                 logger.error(f'handler not found: {payload}')
                 continue
 
-            try:
-                await handler(payload)
-            except Exception as e:
-                logger.exception(e)
-                # raise
+            result = handler(payload)
+            if inspect.isawaitable(result):
+                await result
 
     def enqueue(self, payload):
         self._queue.put_nowait(payload)

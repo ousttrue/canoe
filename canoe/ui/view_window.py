@@ -1,9 +1,11 @@
 from typing import Optional, Callable, List, Tuple
+import bs4
 import prompt_toolkit.layout
 import prompt_toolkit.buffer
 import prompt_toolkit.filters
 import prompt_toolkit.key_binding
 import prompt_toolkit.key_binding.bindings.named_commands
+from .. import event
 
 
 class ViewWindow:
@@ -77,8 +79,9 @@ class ViewWindow:
     def __pt_container__(self) -> prompt_toolkit.layout.containers.Container:
         return self.container
 
-    def set_html_get_title(self, html: str) -> str:
-        text, title = self.lexer.lex_html(html)
+    def set_html_soup(self, soup: bs4.BeautifulSoup) -> str:
+        self.soup = soup
+        text, title = self.lexer.lex_html(soup)
         self.read_only = False
         self.buffer.text = text
         self.read_only = True
@@ -91,19 +94,18 @@ class ViewWindow:
                 match self.lexer.focus[anchor_index]:
                     case Anchor(tag):
                         href = tag['href']
-                        return ('GET', href)
+                        return ('GET', href)  # type: ignore
 
                     case Input(tag, form):
                         if form:
-                            method = form.get('method', 'GET')
-                            action = form.get('action')
-                            if action:
-                                match tag.get('type'):
-                                    case 'submit':
-                                        return (method, action)
-                                    case 'text':
-                                        # TODO input
-                                        pass
+                            match tag.get('type', 'text'):
+                                case 'submit':
+                                    method = form.get('method', 'GET')
+                                    action = form.get('action')
+                                    if action:
+                                        return (method, action)  # type: ignore
+                                case 'text':
+                                    event.enqueue(event.FocusInputCommand(tag))
 
             case _:
                 return None

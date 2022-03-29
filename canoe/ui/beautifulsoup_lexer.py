@@ -105,14 +105,13 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
 
         self.focus.append(Input(tag, n, form))
 
-        input_type = 'text'
-        match tag.get('type'):
+        match tag.get('type', 'text'):
             case 'hidden':
                 values = ','.join(f'{k}={v}' for k,
                                   v in tag.attrs.items() if k in INPUT_KEYS)
                 self.push(f'({values})', 'class:input.hidden')
 
-            case 'text' | None:
+            case 'text':
                 name = tag.get('name')
                 value = tag.get('value')
                 self.push(f'{name}=[{value:20}]',
@@ -127,8 +126,7 @@ class BeautifulSoupLexer(prompt_toolkit.lexers.Lexer):
                 values = ','.join(f'{k}={v}' for k, v in tag.attrs.items())
                 self.push(f'({values})', 'class:input.unknown')
 
-    def lex_html(self, html: str) -> Tuple[str, str]:
-        soup = bs4.BeautifulSoup(html, 'html.parser')
+    def lex_html(self, soup: bs4.BeautifulSoup) -> Tuple[str, str]:
         self.lines = [[]]
         self.title = ''
         for e in soup.children:

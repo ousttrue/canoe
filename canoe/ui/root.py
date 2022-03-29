@@ -1,4 +1,5 @@
 from typing import Callable, Union, Coroutine, Any, Optional
+import bs4
 import prompt_toolkit.application
 import prompt_toolkit.styles
 import prompt_toolkit.layout
@@ -12,6 +13,7 @@ import prompt_toolkit.key_binding.bindings.named_commands
 import prompt_toolkit.filters
 import prompt_toolkit.keys
 from prompt_toolkit.layout.dimension import LayoutDimension as D
+from .. import event
 
 
 class Root:
@@ -84,11 +86,15 @@ class Root:
         from .bar import Bar
         self.title_bar = Bar()
 
-        def on_body(body: str):
-            title = self.view.set_html_get_title(body)
-            self.title_bar.text = title
+        def on_body(payload: event.UpdateHtml):
+            soup = bs4.BeautifulSoup(payload.html, 'html.parser')
+            event.enqueue(event.UpdateSoup(soup))
+        event.register(event.UpdateHtml, on_body)
 
-        self.client.on_body.bind(on_body)
+        def on_soup(payload: event.UpdateSoup):
+            title = self.view.set_html_soup(payload.soup)
+            self.title_bar.text = title
+        event.register(event.UpdateSoup, on_soup)
 
         from .status_bar import StatusBar
 
@@ -101,8 +107,9 @@ class Root:
             self.status_bar.lines = len(doc.lines)
         self.view.on_buffer_callbacks.append(on_buffer_changed)
 
-        from .prompt import YesNoPrompt
+        from .prompt import YesNoPrompt, InputPrompt
         self._quit_prompt = YesNoPrompt()
+        self._input_prompt = InputPrompt()
 
         from .request_info import RequestInfo, ResponseInfo, Logger
 
@@ -124,6 +131,7 @@ class Root:
                 self.status_bar,
                 self.logger,
                 self._quit_prompt,
+                self._input_prompt,
             ]
         )
 

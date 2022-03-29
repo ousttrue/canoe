@@ -1,4 +1,3 @@
-from typing import Generic, TypeVar, List, Callable
 import aiohttp
 import logging
 from . import event
@@ -11,7 +10,6 @@ class Client:
         self.session = aiohttp.ClientSession()
         self.on_request = event.Event[str]()
         self.on_response = event.Event[aiohttp.ClientResponse]()
-        self.on_body = event.Event[str]()
         self.title = ''
         self.status = ''
 
@@ -22,4 +20,4 @@ class Client:
         async with self.session.get(command.url) as response:
             self.on_response(response)
             body = await response.text()
-            self.on_body(body)
+            event.enqueue(event.UpdateHtml(body))

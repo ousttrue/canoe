@@ -68,7 +68,7 @@ async def main():
     #
     # start up
     #
-    root.client.push_url(args.url)
+    root.client.push_url('GET', args.url)
 
     await root.application.run_async()
 

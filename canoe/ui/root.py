@@ -160,6 +160,6 @@ class Root:
         self._quit_prompt.focus(event, on_accept)
 
     def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        url = self.view.get_url_under_cursor()
-        if url:
-            self.client.push_url(url)
+        match self.view.get_url_under_cursor():
+            case method, url:
+                self.client.push_url(method, url)

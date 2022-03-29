@@ -1,4 +1,4 @@
-from typing import Optional, Callable, List
+from typing import Optional, Callable, List, Tuple
 import prompt_toolkit.layout
 import prompt_toolkit.buffer
 import prompt_toolkit.filters
@@ -61,13 +61,26 @@ class ViewWindow:
         self.read_only = True
         return title
 
-    def get_url_under_cursor(self) -> Optional[str]:
-
+    def get_url_under_cursor(self) -> Optional[Tuple[str, str]]:
+        from .beautifulsoup_lexer import Anchor, Input
         match self.hover.anchor_index:
             case int() as anchor_index:
-                anchor = self.lexer.focus[anchor_index].tag
-                href = anchor['href']
-                return href
+                match self.lexer.focus[anchor_index]:
+                    case Anchor(tag):
+                        href = tag['href']
+                        return ('GET', href)
+
+                    case Input(tag, form):
+                        if form:
+                            method = form.get('method', 'GET')
+                            action = form.get('action')
+                            if action:
+                                match tag.get('type'):
+                                    case 'submit':
+                                        return (method, action)
+                                    case 'text':
+                                        # TODO input
+                                        pass
 
             case _:
                 return None

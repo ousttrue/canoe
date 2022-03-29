@@ -29,7 +29,7 @@ class Client:
         self.title = ''
         self.status = ''
 
-    def push_url(self, url: str):
+    def push_url(self, method: str, url: str):
         async def _async():
             logger.info(url)
             self.on_request(url)

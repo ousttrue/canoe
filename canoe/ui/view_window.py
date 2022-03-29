@@ -65,21 +65,24 @@ class ViewWindow:
 
         match self.hover.anchor_index:
             case int() as anchor_index:
-                anchor = self.lexer.anchors[anchor_index]
+                anchor = self.lexer.focus[anchor_index].tag
                 href = anchor['href']
                 return href
+
+            case _:
+                return None
 
     def focus(self, e: prompt_toolkit.key_binding.KeyPressEvent):
         e.app.layout.focus(self.buffer)
 
-    def anchor_next(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        anchor = self.anchor.get_anchor_next(self.buffer.document)
-        if anchor:
+    def focus_next(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        focus = self.anchor.get_focus_next(self.buffer.document)
+        if focus:
             self.buffer.cursor_position = self.buffer.document.translate_row_col_to_index(
-                anchor.row, anchor.col_start)
+                focus.row, focus.col_start)
 
-    def anchor_prev(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        anchor = self.anchor.get_anchor_prev(self.buffer.document)
-        if anchor:
+    def focus_prev(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        focus = self.anchor.get_focus_prev(self.buffer.document)
+        if focus:
             self.buffer.cursor_position = self.buffer.document.translate_row_col_to_index(
-                anchor.row, anchor.col_start)
+                focus.row, focus.col_start)

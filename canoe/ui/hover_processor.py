@@ -5,12 +5,12 @@ import prompt_toolkit.layout.processors
 import prompt_toolkit.layout.utils
 import prompt_toolkit.document
 
-ANCHORE_PATTERN = re.compile(r'\bclass:anchor class:_(\d+)\b')
+FOCUS_PATTERN = re.compile(r'\bclass:_(\d+)\b')
 
 
 @dataclasses.dataclass
-class Anchor:
-    anchor_index: int
+class Focus:
+    focus_index: int
     row: int
     col_start: int
     col_end: int
@@ -31,14 +31,17 @@ class Anchor:
 
 
 class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
+
     def __init__(self) -> None:
         super().__init__()
-        self.document = None
-        self.anchor_map: Dict[int, Anchor] = {}
-        self.anchor_line_map: Dict[int, List[Anchor]] = {}
+        self.document: Optional[prompt_toolkit.document.Document] = None
+        self.focus_list: List[Focus] = []
+        self.focus_map: Dict[int, Focus] = {}
+        self.focus_line_map: Dict[int, List[Focus]] = {}
 
     def apply_transformation(
-        self, transformation_input: prompt_toolkit.layout.processors.TransformationInput
+        self, transformation_input: prompt_toolkit.layout.processors.
+        TransformationInput
     ) -> prompt_toolkit.layout.processors.Transformation:
         (
             buffer_control,
@@ -52,75 +55,90 @@ class AnchorProcessor(prompt_toolkit.layout.processors.Processor):
 
         if self.document != document:
             self.document = document
-            self.anchor_map.clear()
-            self.anchor_line_map.clear()
+            self.focus_list.clear()
+            self.focus_map.clear()
+            self.focus_line_map.clear()
 
         # In case of selection, highlight all matches.
         # Get cursor column.
         fragments = prompt_toolkit.layout.utils.explode_text_fragments(
             fragments)
 
-        if lineno not in self.anchor_line_map:
-            line_list: List[Anchor] = []
-            self.anchor_line_map[lineno] = line_list
+        if lineno not in self.focus_line_map:
+            line_list: List[Focus] = []
+            self.focus_line_map[lineno] = line_list
             for i, fragment in enumerate(fragments):
                 style, text, *_ = fragment
-                m = ANCHORE_PATTERN.search(style)
+                m = FOCUS_PATTERN.search(style)
                 if m:
-                    anchor_index = int(m.group(1))
-                    anchor = self.anchor_map.get(anchor_index)
-                    if anchor:
-                        anchor.push(i, text)
+                    focus_index = int(m.group(1))
+                    focus = self.focus_map.get(focus_index)
+                    if focus:
+                        focus.push(i, text)
                     else:
-                        anchor = Anchor(anchor_index, lineno, i, i, text)
-                        self.anchor_map[anchor_index] = anchor
-                        line_list.append(anchor)
+                        focus = Focus(focus_index, lineno, i, i, text)
+                        self.focus_list.append(focus)
+                        self.focus_map[focus_index] = focus
+                        line_list.append(focus)
 
         return prompt_toolkit.layout.processors.Transformation(fragments)
 
-    def _cursor_anchor(self, doc: prompt_toolkit.document.Document) -> Optional[Anchor]:
-        line_list = self.anchor_line_map.get(doc.cursor_position_row)
+    def _cursor_focus(
+            self, doc: prompt_toolkit.document.Document) -> Optional[Focus]:
+        line_list = self.focus_line_map.get(doc.cursor_position_row)
         if line_list:
-            for anchor in line_list:
-                if anchor.is_hover(doc.cursor_position_row, doc.cursor_position_col):
-                    return anchor
+            for focus in line_list:
+                if focus.is_hover(doc.cursor_position_row,
+                                  doc.cursor_position_col):
+                    return focus
+        return None
 
-    def get_anchor_next(self, doc: prompt_toolkit.document.Document) -> Optional[Anchor]:
-        anchor = self._cursor_anchor(doc)
-        if anchor:
-            return self.anchor_map.get(anchor.anchor_index+1)
+    def get_focus_next(
+            self, doc: prompt_toolkit.document.Document) -> Optional[Focus]:
+        focus = self._cursor_focus(doc)
+        if focus:
+            index = self.focus_list.index(focus)
+            if index != -1 and index + 1 < len(self.focus_list):
+                return self.focus_list[index + 1]
         else:
             target = doc.cursor_position_col
             for row in range(doc.cursor_position_row, len(doc.lines)):
-                line_list = self.anchor_line_map.get(row)
+                line_list = self.focus_line_map.get(row)
                 if line_list:
-                    for anchor in line_list:
-                        if not isinstance(target, int) or anchor.col_start > target:
-                            return anchor
-                target = None
+                    for focus in line_list:
+                        if not isinstance(target,
+                                          int) or focus.col_start > target:
+                            return focus
+        return None
 
-    def get_anchor_prev(self, doc: prompt_toolkit.document.Document) -> Optional[Anchor]:
-        anchor = self._cursor_anchor(doc)
-        if anchor:
-            return self.anchor_map.get(anchor.anchor_index-1)
+    def get_focus_prev(
+            self, doc: prompt_toolkit.document.Document) -> Optional[Focus]:
+        focus = self._cursor_focus(doc)
+        if focus:
+            index = self.focus_list.index(focus)
+            if index >= 1 and index - 1 < len(self.focus_list):
+                return self.focus_list[index - 1]
         else:
             target = doc.cursor_position_col
             for row in range(doc.cursor_position_row, len(doc.lines)):
-                line_list = self.anchor_line_map.get(row)
+                line_list = self.focus_line_map.get(row)
                 if line_list:
-                    for anchor in line_list:
-                        if not isinstance(target, int) or anchor.col_end < target:
-                            return anchor
-                target = None
+                    for focus in line_list:
+                        if not isinstance(target,
+                                          int) or focus.col_end < target:
+                            return focus
+        return None
 
 
 class HoverProcessor(prompt_toolkit.layout.processors.Processor):
+
     def __init__(self) -> None:
         super().__init__()
         self.anchor_index: Optional[int] = None
 
     def apply_transformation(
-        self, transformation_input: prompt_toolkit.layout.processors.TransformationInput
+        self, transformation_input: prompt_toolkit.layout.processors.
+        TransformationInput
     ) -> prompt_toolkit.layout.processors.Transformation:
         (
             buffer_control,
@@ -146,7 +164,7 @@ class HoverProcessor(prompt_toolkit.layout.processors.Processor):
             if cursor_column < len(fragments):
                 style, text = fragments[cursor_column]  # type: ignore
 
-                m = ANCHORE_PATTERN.search(style)
+                m = FOCUS_PATTERN.search(style)
                 if m:
                     self.anchor_index = int(m.group(1))
                     for i, fragment in enumerate(fragments):

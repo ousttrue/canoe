@@ -63,8 +63,7 @@ class Root:
         [command]
         '''
         from .address_bar import AddressBar
-        self.address_bar = AddressBar(
-            self.client.push_url, style="class:status")
+        self.address_bar = AddressBar(style="class:status")
         self.client.on_request.bind(self.address_bar.set_text)
 
         from .view_window import ViewWindow
@@ -162,4 +161,5 @@ class Root:
     def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
         match self.view.get_url_under_cursor():
             case method, url:
-                self.client.push_url(method, url)
+                from .. import event
+                event.enqueue(event.OpenCommand(method, url))

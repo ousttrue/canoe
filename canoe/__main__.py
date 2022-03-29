@@ -68,9 +68,14 @@ async def main():
     #
     # start up
     #
-    root.client.push_url('GET', args.url)
+    from . import event
+    event.enqueue(event.OpenCommand('GET', args.url))
 
-    await root.application.run_async()
+    def pre_run():
+        assert(root.application.loop)
+        event.pre_run(root.application.loop)
+
+    await root.application.run_async(pre_run=pre_run)
 
 if __name__ == '__main__':
     logging.basicConfig(level=logging.DEBUG)

@@ -1,6 +1,8 @@
 from typing import Generic, TypeVar, List, Callable
 import aiohttp
 import logging
+from . import event
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,11 +31,12 @@ class Client:
         self.title = ''
         self.status = ''
 
-    def push_url(self, method: str, url: str):
+        event.register(event.OpenCommand, self.open_command)
+
+    def open_command(self, command: event.OpenCommand):
         async def _async():
-            logger.info(url)
-            self.on_request(url)
-            async with self.session.get(url) as response:
+            self.on_request(command.url)
+            async with self.session.get(command.url) as response:
                 self.on_response(response)
                 body = await response.text()
                 self.on_body(body)

@@ -6,8 +6,7 @@ D = prompt_toolkit.layout.Dimension
 
 
 class AddressBar:
-    def __init__(self, push_url, style="") -> None:
-        self.push_url = push_url
+    def __init__(self, style="") -> None:
         self.buffer = prompt_toolkit.buffer.Buffer(multiline=False)
         self.has_focus = prompt_toolkit.filters.has_focus(self.buffer)
         self.control = prompt_toolkit.layout.controls.BufferControl(
@@ -28,5 +27,6 @@ class AddressBar:
         e.app.layout.focus(self.buffer)
 
     def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        self.push_url(self.buffer.text)
+        from .. import event
+        event.enqueue(event.OpenCommand('GET', self.buffer.text))
         e.app.layout.focus_previous()

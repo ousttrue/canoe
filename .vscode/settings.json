@@ -1,4 +1,5 @@
 {
+    "workbench.colorTheme": "Solarized Dark",
     "python.testing.unittestArgs": [
         "-v",
         "-s",

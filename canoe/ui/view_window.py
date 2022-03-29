@@ -3,10 +3,12 @@ import prompt_toolkit.layout
 import prompt_toolkit.buffer
 import prompt_toolkit.filters
 import prompt_toolkit.key_binding
+import prompt_toolkit.key_binding.bindings.named_commands
 
 
 class ViewWindow:
-    def __init__(self) -> None:
+    def __init__(self, kb: prompt_toolkit.key_binding.KeyBindings) -> None:
+        self.kb = kb
         self.read_only = True
         self.on_buffer_callbacks: List[Callable[[
             prompt_toolkit.buffer.Buffer], None]] = []
@@ -50,6 +52,27 @@ class ViewWindow:
             wrap_lines=wrap_lines,
             content=self.control,
         )
+
+        #
+        # key bindings
+        #
+        self._keybind(self.quit, 'Q')
+        self._keybind(self.down, 'j')
+        self._keybind(self.up, 'k')
+        self.kb.add('h', filter=self.has_focus)(
+            prompt_toolkit.key_binding.bindings.named_commands.get_by_name("backward-char"))
+        self.kb.add('l', filter=self.has_focus)(
+            prompt_toolkit.key_binding.bindings.named_commands.get_by_name("forward-char"))
+        # 0
+        # $
+        # space
+        # b
+        self._keybind(self.enter, 'enter')
+        self._keybind(self.focus_next, 'tab')
+        self._keybind(self.focus_prev, 's-tab')
+
+    def _keybind(self, callback, *args):
+        self.kb.add(*args, filter=self.has_focus, eager=True)(callback)
 
     def __pt_container__(self) -> prompt_toolkit.layout.containers.Container:
         return self.container
@@ -99,3 +122,18 @@ class ViewWindow:
         if focus:
             self.buffer.cursor_position = self.buffer.document.translate_row_col_to_index(
                 focus.row, focus.col_start)
+
+    def up(self, event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+        event.current_buffer.auto_up(count=event.arg)
+
+    def down(self, event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
+        event.current_buffer.auto_down(count=event.arg)
+
+    def quit(self, event: prompt_toolkit.key_binding.KeyPressEvent):
+        event.app.exit()
+
+    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
+        match self.get_url_under_cursor():
+            case method, url:
+                from .. import event
+                event.enqueue(event.OpenCommand(method, url))

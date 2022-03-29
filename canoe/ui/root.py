@@ -14,18 +14,6 @@ import prompt_toolkit.keys
 from prompt_toolkit.layout.dimension import LayoutDimension as D
 
 
-def quit(event: prompt_toolkit.key_binding.KeyPressEvent):
-    event.app.exit()
-
-
-def up(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
-    event.current_buffer.auto_up(count=event.arg)
-
-
-def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
-    event.current_buffer.auto_down(count=event.arg)
-
-
 class Root:
     def __init__(self) -> None:
 
@@ -65,28 +53,18 @@ class Root:
             enable_page_navigation_bindings=False,
         )
 
-        #
-        # key bindings
-        #
-        self._keybind(quit, 'Q', filter=self.view.has_focus)
-        self._keybind(self.quit_prompt, 'q', eager=True,
-                      filter=self.view.has_focus)
-        self.key_bindings.add('h', filter=self.view.has_focus)(
-            prompt_toolkit.key_binding.bindings.named_commands.get_by_name("backward-char"))
-        self._keybind(down, 'j', filter=self.view.has_focus)
-        self._keybind(up, 'k', filter=self.view.has_focus)
-        self.key_bindings.add('l', filter=self.view.has_focus)(
-            prompt_toolkit.key_binding.bindings.named_commands.get_by_name("forward-char"))
-        # 0
-        # $
-        # space
-        # b
-        self._keybind(self.enter, 'enter', filter=self.view.has_focus)
-        self._keybind(self.view.focus_next, 'tab', filter=self.view.has_focus)
-        self._keybind(self.view.focus_prev, 's-tab',
-                      filter=self.view.has_focus)
+        self.view._keybind(self.quit_prompt, 'q')
         # shift-tab
-        self._keybind(self.address_bar.focus, 'U', filter=self.view.has_focus)
+        self.view._keybind(self.address_bar.focus, 'U')
+
+    def quit_prompt(self, event: prompt_toolkit.key_binding.KeyPressEvent):
+        " Quit. "
+        def on_accept(value: str):
+            if value == 'y':
+                event.app.exit()
+            else:
+                event.app.layout.focus(self.view.control)
+        self._quit_prompt.focus(event, on_accept)
 
     def _browser_layout(self) -> prompt_toolkit.layout.containers.Container:
         '''
@@ -101,7 +79,7 @@ class Root:
         self.client.on_request.bind(self.address_bar.set_text)
 
         from .view_window import ViewWindow
-        self.view = ViewWindow()
+        self.view = ViewWindow(self.key_bindings)
 
         from .bar import Bar
         self.title_bar = Bar()
@@ -150,40 +128,3 @@ class Root:
         )
 
         return splitter
-
-    def _keybind(self, func: Callable[[prompt_toolkit.key_binding.KeyPressEvent], None], *keys: Union[prompt_toolkit.keys.Keys, str],
-                 filter: prompt_toolkit.filters.FilterOrBool = True,
-                 eager: prompt_toolkit.filters.FilterOrBool = False,
-                 is_global: prompt_toolkit.filters.FilterOrBool = False,
-                 save_before: Callable[[prompt_toolkit.key_binding.KeyPressEvent], bool] = (
-            lambda e: True),
-            record_in_macro: prompt_toolkit.filters.FilterOrBool = True):
-        keys = tuple(prompt_toolkit.key_binding.key_bindings._parse_key(k)
-                     for k in keys)
-        self.key_bindings.bindings.append(
-            prompt_toolkit.key_binding.key_bindings.Binding(
-                keys,
-                func,
-                filter=filter,
-                eager=eager,
-                is_global=is_global,
-                save_before=save_before,
-                record_in_macro=record_in_macro,
-            )
-        )
-        self.key_bindings._clear_cache()
-
-    def quit_prompt(self, event: prompt_toolkit.key_binding.KeyPressEvent):
-        " Quit. "
-        def on_accept(value: str):
-            if value == 'y':
-                event.app.exit()
-            else:
-                event.app.layout.focus(self.view.control)
-        self._quit_prompt.focus(event, on_accept)
-
-    def enter(self, e: prompt_toolkit.key_binding.KeyPressEvent):
-        match self.view.get_url_under_cursor():
-            case method, url:
-                from .. import event
-                event.enqueue(event.OpenCommand(method, url))

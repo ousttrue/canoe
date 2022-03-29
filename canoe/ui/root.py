@@ -27,11 +27,10 @@ def down(event: prompt_toolkit.key_binding.KeyPressEvent) -> None:
 
 
 class Root:
-    def __init__(self, queue) -> None:
-        self.queue = queue
+    def __init__(self) -> None:
 
         from ..client import Client
-        self.client = Client(queue)
+        self.client = Client()
 
         browser_layout = self._browser_layout()
 
@@ -178,16 +177,6 @@ class Root:
             )
         )
         self.key_bindings._clear_cache()
-
-    def _keybind_async(self, func: Callable[[prompt_toolkit.key_binding.KeyPressEvent], Coroutine[Any, Any, None]], *keys: Union[prompt_toolkit.keys.Keys, str], **kw):
-        assert keys
-
-        def callback(e: prompt_toolkit.key_binding.KeyPressEvent):
-            async def task():
-                await func(e)
-            self.queue.put_nowait(task)
-
-        self._keybind(callback, *keys, **kw)
 
     def quit_prompt(self, event: prompt_toolkit.key_binding.KeyPressEvent):
         " Quit. "

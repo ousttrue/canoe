@@ -14,16 +14,10 @@ async def main():
     args = parser.parse_args()
 
     #
-    # worker
-    #
-    from .async_processor import AsyncProcessor
-    processor = AsyncProcessor()
-
-    #
     # UI
     #
     from .ui.root import Root
-    root = Root(processor.queue)
+    root = Root()
 
     #
     # start up
